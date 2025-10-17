@@ -3,7 +3,7 @@ import uvicorn
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field # Import Field
+from pydantic import BaseModel # Removed Field import
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
@@ -67,7 +67,7 @@ app = FastAPI()
 
 @app.on_event("startup")
 def on_startup():
-    # Create database tables if they don\\'t exist
+    # Create database tables if they don\\\"t exist
     Base.metadata.create_all(bind=engine)
 
 # --- Dependencies ---
@@ -157,9 +157,9 @@ class RecentActivity(BaseModel):
         from_attributes = True
 
 class ChartData(BaseModel):
-    # Explicitly define fields for Pydantic to handle JSON columns
-    labels: List[str] = Field(default_factory=list)
-    values: List[int] = Field(default_factory=list)
+    # Simplified to avoid default_factory issue
+    labels: List[str] = []
+    values: List[int] = []
     class Config:
         from_attributes = True
 
