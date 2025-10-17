@@ -193,17 +193,30 @@ async def chat(request: ChatRequest):
     for msg in request.messages:
         openai_messages.append({"role": msg.role, "content": msg.content})
 
+    # إضافة طباعة لتصحيح الأخطاء
+    print(f"Received messages for OpenAI: {openai_messages}")
+
     try:
         # استدعاء OpenAI API
         chat_completion = client.chat.completions.create(
-            model="gemini-2.5-flash",  # يمكنك استخدام نماذج أخرى مثل gpt-4.1-mini أو gpt-4.1-nano
+            model="gemini-2.5-flash", # أو gpt-4.1-mini أو gpt-4.1-nano
             messages=openai_messages
         )
-        reply = chat_completion.choices[0].message.content
-    except Exception as e:
-        # في حال حدوث خطأ، يتم إرجاع رسالة خطأ واضحة
-        raise HTTPException(status_code=500, detail=f"Error communicating with AI service: {str(e)}")
+        # إضافة طباعة لتصحيح الأخطاء
+        print(f"OpenAI chat_completion response: {chat_completion}")
+        
+        # التحقق من وجود الرد قبل محاولة الوصول إليه
+        if chat_completion.choices and chat_completion.choices[0].message.content is not None:
+            reply = chat_completion.choices[0].message.content
+        else:
+            reply = "عذرًا، لم أتمكن من الحصول على رد من نموذج الذكاء الاصطناعي."
+            print("Warning: OpenAI response content was empty or missing.")
 
+    except Exception as e:
+        reply = f"عذرًا، حدث خطأ أثناء معالجة طلبك: {str(e)}"
+        print(f"Error during OpenAI API call: {e}")
+
+    print(f"Final reply sent to frontend: {reply}")
     return ChatResponse(reply=reply)
 
 # Authentication endpoint
