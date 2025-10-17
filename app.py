@@ -13,9 +13,8 @@ import os
 
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, JSON
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session # Corrected import for Session
 from sqlalchemy.sql import func
-from sqlalchemy.orm import Session
 
 # Configuration
 SECRET_KEY = os.environ.get("SECRET_KEY", "your-super-secret-key") # Use environment variable
@@ -62,7 +61,7 @@ class DBChartData(Base):
     values = Column(JSON)
 
 # Create database tables
-# This will create tables if they don't exist. In production, consider using migrations.
+# This will create tables if they don\\'t exist. In production, consider using migrations.
 Base.metadata.create_all(bind=engine)
 
 ALGORITHM = "HS256"
@@ -242,7 +241,7 @@ async def get_dashboard_data(db: Session = Depends(get_db)): # current_user: Use
 
 @app.post("/api/chat")
 async def chat_with_gpt(chat_input: ChatInput, request: Request):
-    # This is a simplified example. In a real application, you'd manage conversation history.
+    # This is a simplified example. In a real application, you\\'d manage conversation history.
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
