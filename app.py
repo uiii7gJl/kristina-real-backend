@@ -199,7 +199,7 @@ async def chat(request: ChatRequest):
     try:
         # استدعاء OpenAI API
         chat_completion = client.chat.completions.create(
-            model="gemini-2.5-flash", # أو gpt-4.1-mini أو gpt-4.1-nano
+            model="gpt-4.1-mini",  # تم تغيير النموذج هنا إلى gpt-4.1-mini
             messages=openai_messages
         )
         # إضافة طباعة لتصحيح الأخطاء
