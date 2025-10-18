@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float
@@ -119,11 +118,15 @@ else:
 async def root():
     return {"message": "Welcome to Mareekh/Kristina Backend!"}
 
+@app.get("/api/version", tags=["Health Check"])
+async def get_version():
+    return {"version": "1.0.0", "status": "ok"}
+
 @app.get("/health", tags=["Health Check"])
 async def health_check():
     return {"status": "ok", "message": "Backend is healthy"}
 
-@app.get("/metrics", tags=["Dashboard"])
+@app.get("/api/dashboard/metrics", tags=["Dashboard"])
 async def get_dashboard_metrics(db: Session = Depends(get_db)):
     metrics = db.query(DashboardMetric).all()
     if not metrics:
@@ -150,7 +153,7 @@ async def get_dashboard_metrics(db: Session = Depends(get_db)):
         "last_updated": metric.last_updated.isoformat()
     } for metric in metrics]
 
-@app.post("/chat", tags=["AI Chat"])
+@app.post("/api/chat", tags=["AI Chat"])
 async def chat_with_ai(message: dict):
     if not openai_client:
         raise HTTPException(status_code=503, detail="AI chat service is not available. OPENAI_API_KEY is missing.")
@@ -173,6 +176,19 @@ async def chat_with_ai(message: dict):
         raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
 
 # Example of a protected endpoint (requires authentication)
+# @app.get("/users/me", tags=["Users"])
+# async def read_users_me(current_user: User = Depends(get_current_active_user)):
+#     return current_user
+
+# You would also need authentication endpoints like /token to generate JWTs
+# and a dependency for get_current_active_user that decodes the JWT.
+# For brevity, these are omitted but would be part of a full implementation.
+
+# To run this file locally:
+# pip install fastapi uvicorn sqlalchemy psycopg2-binary python-jose passlib openai
+# uvicorn app:app --reload --host 0.0.0.0 --port 8000
+# Make sure to set environment variables: DATABASE_URL, OPENAI_API_KEY, SECRET_KEY
+
 # @app.get("/users/me", tags=["Users"])
 # async def read_users_me(current_user: User = Depends(get_current_active_user)):
 #     return current_user
