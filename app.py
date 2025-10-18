@@ -185,4 +185,4 @@ async def chat_with_ai(message: dict):
 # pip install fastapi uvicorn sqlalchemy psycopg2-binary python-jose passlib openai
 # uvicorn app:app --reload --host 0.0.0.0 --port 8000
 # Make sure to set environment variables: DATABASE_URL, OPENAI_API_KEY, SECRET_KEY
-)
+
