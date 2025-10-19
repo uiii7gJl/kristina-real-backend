@@ -188,17 +188,3 @@ async def chat_with_ai(message: dict):
 # pip install fastapi uvicorn sqlalchemy psycopg2-binary python-jose passlib openai
 # uvicorn app:app --reload --host 0.0.0.0 --port 8000
 # Make sure to set environment variables: DATABASE_URL, OPENAI_API_KEY, SECRET_KEY
-
-# @app.get("/users/me", tags=["Users"])
-# async def read_users_me(current_user: User = Depends(get_current_active_user)):
-#     return current_user
-
-# You would also need authentication endpoints like /token to generate JWTs
-# and a dependency for get_current_active_user that decodes the JWT.
-# For brevity, these are omitted but would be part of a full implementation.
-
-# To run this file locally:
-# pip install fastapi uvicorn sqlalchemy psycopg2-binary python-jose passlib openai
-# uvicorn app:app --reload --host 0.0.0.0 --port 8000
-# Make sure to set environment variables: DATABASE_URL, OPENAI_API_KEY, SECRET_KEY
-
