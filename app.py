@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
@@ -150,16 +150,19 @@ async def get_dashboard_metrics(db: Session = Depends(get_db)):
 
 # --- Chat Endpoint ---
 @app.post("/api/chat", tags=["AI Chat"])
-async def chat_with_ai(message: dict):
+async def chat_with_ai(payload: dict):
     if not openai_client:
         raise HTTPException(status_code=503, detail="AI chat service unavailable")
 
-    # يتوقع الرسائل كما في React frontend: {messages:[{role,content}, ...]}
-    messages_list = message.get("messages")
-    if not messages_list:
-        raise HTTPException(status_code=400, detail="No messages provided")
+    # إما {messages: [...] } أو {message: "text"}
+    messages_list = payload.get("messages")
+    if messages_list is None:
+        single_msg = payload.get("message")
+        if single_msg:
+            messages_list = [{"role": "user", "content": single_msg}]
+        else:
+            raise HTTPException(status_code=400, detail="No messages provided")
 
-    # تحويل إلى نص للـOpenAI
     user_content = "\n".join([m["content"] for m in messages_list if m["role"]=="user"])
     try:
         response = openai_client.chat.completions.create(
@@ -169,8 +172,7 @@ async def chat_with_ai(message: dict):
                 {"role": "user", "content": user_content}
             ]
         )
-        ai_response = response.choices[0].message.content
-        return {"reply": ai_response}
+        return {"reply": response.choices[0].message.content}
     except Exception as e:
         logger.error(f"AI chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
