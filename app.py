@@ -8,8 +8,12 @@ from datetime import datetime, timedelta
 import os
 import jwt
 from passlib.context import CryptContext
+import logging
 from typing import Optional
 from openai import OpenAI
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # --- FastAPI App Initialization ---
 app = FastAPI()
@@ -130,21 +134,23 @@ async def health_check():
 async def get_dashboard_metrics(db: Session = Depends(get_db)):
     metrics = db.query(DashboardMetric).all()
     if not metrics:
-        # Populate with some dummy data if no metrics exist
-        if os.getenv("POPULATE_DUMMY_DATA", "false").lower() == "true":
-            dummy_metrics_data = [
-                {"name": "Total Users", "value": 1250, "unit": "users"},
-                {"name": "Active Sessions", "value": 340, "unit": "sessions"},
-                {"name": "Avg. Response Time", "value": 1.2, "unit": "s"},
-                {"name": "Error Rate", "value": 0.5, "unit": "%"},
-            ]
-            for data in dummy_metrics_data:
-                metric = DashboardMetric(**data)
-                db.add(metric)
-            db.commit()
-            metrics = db.query(DashboardMetric).all()
-        else:
-            raise HTTPException(status_code=404, detail="No dashboard metrics found. Set POPULATE_DUMMY_DATA=true to generate dummy data.")
+        logger.info("No dashboard metrics found. Attempting to populate dummy data.")
+        dummy_metrics_data = [
+            {"name": "Total Users", "value": 1250, "unit": "users"},
+            {"name": "Active Sessions", "value": 340, "unit": "sessions"},
+            {"name": "Avg. Response Time", "value": 1.2, "unit": "s"},
+            {"name": "Error Rate", "value": 0.5, "unit": "%"},
+        ]
+        for data in dummy_metrics_data:
+            metric = DashboardMetric(**data)
+            db.add(metric)
+        db.commit()
+        metrics = db.query(DashboardMetric).all()
+        logger.info("Dummy data populated for dashboard metrics.")
+
+    if not metrics:
+        logger.warning("Still no dashboard metrics after attempting to populate dummy data.")
+        raise HTTPException(status_code=404, detail="No dashboard metrics found even after attempting to populate dummy data.")
 
     return [{
         "name": metric.name,
@@ -155,11 +161,15 @@ async def get_dashboard_metrics(db: Session = Depends(get_db)):
 
 @app.post("/api/chat", tags=["AI Chat"])
 async def chat_with_ai(message: dict):
+    logger.info(f"Received chat message request: {message}")
+
     if not openai_client:
+        logger.error("AI chat service is not available. OPENAI_API_KEY is missing.")
         raise HTTPException(status_code=503, detail="AI chat service is not available. OPENAI_API_KEY is missing.")
 
     user_message = message.get("message")
     if not user_message:
+        logger.warning(f"Bad request: Message cannot be empty. Received: {message}")
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     try:
@@ -171,8 +181,10 @@ async def chat_with_ai(message: dict):
             ]
         )
         ai_response = response.choices[0].message.content
+        logger.info(f"AI chat response: {ai_response}")
         return {"response": ai_response}
     except Exception as e:
+        logger.error(f"AI chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
 
 # Example of a protected endpoint (requires authentication)
@@ -188,3 +200,4 @@ async def chat_with_ai(message: dict):
 # pip install fastapi uvicorn sqlalchemy psycopg2-binary python-jose passlib openai
 # uvicorn app:app --reload --host 0.0.0.0 --port 8000
 # Make sure to set environment variables: DATABASE_URL, OPENAI_API_KEY, SECRET_KEY
+
