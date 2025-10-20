@@ -1,9 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.sql import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from datetime import datetime, timedelta
 import os
 import jwt
@@ -20,12 +18,11 @@ app = FastAPI()
 
 # --- CORS Configuration ---
 origins = [
-    "http://localhost:3000",  # Frontend local development
-    "http://localhost:5173",  # Frontend local development (Vite default )
-    "https://mareekh-frontend.onrender.com", # Example Render frontend URL
-    "https://mareekh-admin.onrender.com", # Example Render admin URL
-    "https://mareekh-user.onrender.com", # Example Render user URL
-    # Add other frontend URLs as needed
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://mareekh-frontend.onrender.com",
+    "https://mareekh-admin.onrender.com",
+    "https://mareekh-user.onrender.com",
 ]
 
 app.add_middleware(
@@ -34,7 +31,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
- )
+)
 
 # --- Database Configuration ---
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -48,7 +45,6 @@ Base = declarative_base()
 # --- Database Models ---
 class User(Base):
     __tablename__ = "users"
-
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
@@ -58,7 +54,6 @@ class User(Base):
 
 class Activity(Base):
     __tablename__ = "activities"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, index=True)
     activity_type = Column(String)
@@ -67,14 +62,13 @@ class Activity(Base):
 
 class DashboardMetric(Base):
     __tablename__ = "dashboard_metrics"
-
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     value = Column(Float)
     unit = Column(String, nullable=True)
     last_updated = Column(DateTime, default=datetime.utcnow)
 
-# Create database tables
+# Create tables
 Base.metadata.create_all(bind=engine)
 
 # --- Dependency to get DB session ---
@@ -86,7 +80,7 @@ def get_db():
         db.close()
 
 # --- Security (JWT) Configuration ---
-SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key") # Use a strong, random key in production
+SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -111,13 +105,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 # --- OpenAI Client ---
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
-    print("Warning: OPENAI_API_KEY environment variable not set. Chat functionality will be disabled.")
+    logger.warning("OPENAI_API_KEY not set. Chat will be disabled.")
     openai_client = None
 else:
     openai_client = OpenAI(api_key=openai_api_key)
 
 # --- API Endpoints ---
-
 @app.get("/", tags=["Health Check"])
 async def root():
     return {"message": "Welcome to Mareekh/Kristina Backend!"}
@@ -130,28 +123,24 @@ async def get_version():
 async def health_check():
     return {"status": "ok", "message": "Backend is healthy"}
 
+# --- Dashboard Metrics ---
+dummy_metrics_data = [
+    {"name": "Total Users", "value": 1250, "unit": "users"},
+    {"name": "Active Sessions", "value": 340, "unit": "sessions"},
+    {"name": "Avg. Response Time", "value": 1.2, "unit": "s"},
+    {"name": "Error Rate", "value": 0.5, "unit": "%"},
+]
+
 @app.get("/api/dashboard/metrics", tags=["Dashboard"])
 async def get_dashboard_metrics(db: Session = Depends(get_db)):
     metrics = db.query(DashboardMetric).all()
     if not metrics:
-        logger.info("No dashboard metrics found. Attempting to populate dummy data.")
-        dummy_metrics_data = [
-            {"name": "Total Users", "value": 1250, "unit": "users"},
-            {"name": "Active Sessions", "value": 340, "unit": "sessions"},
-            {"name": "Avg. Response Time", "value": 1.2, "unit": "s"},
-            {"name": "Error Rate", "value": 0.5, "unit": "%"},
-        ]
+        logger.info("No dashboard metrics found. Populating dummy data.")
         for data in dummy_metrics_data:
             metric = DashboardMetric(**data)
             db.add(metric)
         db.commit()
         metrics = db.query(DashboardMetric).all()
-        logger.info("Dummy data populated for dashboard metrics.")
-
-    if not metrics:
-        logger.warning("Still no dashboard metrics after attempting to populate dummy data.")
-        raise HTTPException(status_code=404, detail="No dashboard metrics found even after attempting to populate dummy data.")
-
     return [{
         "name": metric.name,
         "value": metric.value,
@@ -159,45 +148,29 @@ async def get_dashboard_metrics(db: Session = Depends(get_db)):
         "last_updated": metric.last_updated.isoformat()
     } for metric in metrics]
 
+# --- Chat Endpoint ---
 @app.post("/api/chat", tags=["AI Chat"])
 async def chat_with_ai(message: dict):
-    logger.info(f"Received chat message request: {message}")
-
     if not openai_client:
-        logger.error("AI chat service is not available. OPENAI_API_KEY is missing.")
-        raise HTTPException(status_code=503, detail="AI chat service is not available. OPENAI_API_KEY is missing.")
+        raise HTTPException(status_code=503, detail="AI chat service unavailable")
 
-    user_message = message.get("message")
-    if not user_message:
-        logger.warning(f"Bad request: Message cannot be empty. Received: {message}")
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    # يتوقع الرسائل كما في React frontend: {messages:[{role,content}, ...]}
+    messages_list = message.get("messages")
+    if not messages_list:
+        raise HTTPException(status_code=400, detail="No messages provided")
 
+    # تحويل إلى نص للـOpenAI
+    user_content = "\n".join([m["content"] for m in messages_list if m["role"]=="user"])
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4.1-mini", # Using the suggested model from the prompt
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": "أنت مساعد ذكاء اصطناعي مفيد."},
-                {"role": "user", "content": user_message}
+                {"role": "user", "content": user_content}
             ]
         )
         ai_response = response.choices[0].message.content
-        logger.info(f"AI chat response: {ai_response}")
-        return {"response": ai_response}
+        return {"reply": ai_response}
     except Exception as e:
         logger.error(f"AI chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
-
-# Example of a protected endpoint (requires authentication)
-# @app.get("/users/me", tags=["Users"])
-# async def read_users_me(current_user: User = Depends(get_current_active_user)):
-#     return current_user
-
-# You would also need authentication endpoints like /token to generate JWTs
-# and a dependency for get_current_active_user that decodes the JWT.
-# For brevity, these are omitted but would be part of a full implementation.
-
-# To run this file locally:
-# pip install fastapi uvicorn sqlalchemy psycopg2-binary python-jose passlib openai
-# uvicorn app:app --reload --host 0.0.0.0 --port 8000
-# Make sure to set environment variables: DATABASE_URL, OPENAI_API_KEY, SECRET_KEY
-
