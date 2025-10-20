@@ -16,18 +16,10 @@ logger = logging.getLogger(__name__)
 # --- FastAPI App Initialization ---
 app = FastAPI()
 
-# --- CORS Configuration ---
-origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://mareekh-frontend.onrender.com",
-    "https://mareekh-admin.onrender.com",
-    "https://mareekh-user.onrender.com",
-]
-
+# --- CORS Configuration (allow all origins temporarily) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # مؤقت للتأكد من عمل OPTIONS و POST
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
