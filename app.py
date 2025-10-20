@@ -141,12 +141,8 @@ async def get_dashboard_metrics(db: Session = Depends(get_db)):
             db.add(metric)
         db.commit()
         metrics = db.query(DashboardMetric).all()
-    return [{
-        "name": metric.name,
-        "value": metric.value,
-        "unit": metric.unit,
-        "last_updated": metric.last_updated.isoformat()
-    } for metric in metrics]
+    # تحويل البيانات لتتناسب مع React frontend
+    return [{"label": metric.name, "value": metric.value} for metric in metrics]
 
 # --- Chat Endpoint ---
 @app.post("/api/chat", tags=["AI Chat"])
