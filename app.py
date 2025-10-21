@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Float, func, cast
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
@@ -10,13 +10,14 @@ from typing import Optional
 from openai import OpenAI
 import logging
 
+# إعداد التسجيل
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- FastAPI App ---
-app = FastAPI()
+# --- تهيئة تطبيق FastAPI ---
+app = FastAPI(title="Kristina Backend", version="1.0.0")
 
-# --- CORS Configuration ---
+# --- إعداد CORS ---
 origins = [
     "http://localhost:3000",
     "http://localhost:5173",
@@ -32,7 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Database Configuration ---
+# --- إعداد قاعدة البيانات ---
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set")
@@ -41,7 +42,7 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- Models ---
+# --- النماذج ---
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -63,7 +64,7 @@ class Activity(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# --- DB Session ---
+# --- جلسة قاعدة البيانات ---
 def get_db():
     db = SessionLocal()
     try:
@@ -71,23 +72,27 @@ def get_db():
     finally:
         db.close()
 
-# --- Security ---
+# --- الأمن (JWT) ---
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key")
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def get_password_hash(password): return pwd_context.hash(password)
-def verify_password(plain, hashed): return pwd_context.verify(plain, hashed)
+def get_password_hash(password): 
+    return pwd_context.hash(password)
+
+def verify_password(plain, hashed): 
+    return pwd_context.verify(plain, hashed)
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=30))
     data.update({"exp": expire})
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
-# --- OpenAI ---
+# --- إعداد OpenAI ---
 openai_api_key = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
 
-# --- Routes ---
+# --- المسارات ---
 @app.get("/", tags=["Health Check"])
 async def root():
     return {"message": "Kristina Backend Active"}
@@ -96,6 +101,7 @@ async def root():
 async def version():
     return {"version": "1.0.0", "status": "ok"}
 
+# --- إحصائيات لوحة التحكم ---
 @app.get("/api/dashboard/metrics", tags=["Dashboard"])
 async def get_metrics(db: Session = Depends(get_db)):
     today = date.today()
@@ -113,20 +119,22 @@ async def get_metrics(db: Session = Depends(get_db)):
     ]
     return metrics
 
+# --- دردشة الذكاء الاصطناعي ---
 @app.post("/api/chat", tags=["AI Chat"])
-async def chat(message: dict):
+async def chat(request: Request):
     if not openai_client:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY missing or invalid")
 
-    content = message.get("message")
-    if not content:
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
-
     try:
+        body = await request.json()
+        content = body.get("message") or body.get("messages")
+        if not content:
+            raise HTTPException(status_code=400, detail="Message cannot be empty")
+
         response = openai_client.chat.completions.create(
             model="gpt-4.1-mini",
             messages=[
-                {"role": "system", "content": "أنت مساعد ذكاء اصطناعي تابع لمنصة Kristina. أجب فقط عن الأسئلة المتعلقة بالموقع ووظائفه."},
+                {"role": "system", "content": "أنت مساعد تابع لمنصة Kristina. أجب عن الأسئلة المتعلقة بالموقع أو الوظائف فقط."},
                 {"role": "user", "content": content},
             ],
         )
